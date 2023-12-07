@@ -1,4 +1,4 @@
-import IJulia
+import IJulia, Pkg
 
 # The julia kernel has built in support for Revise.jl, so this is the 
 # recommended approach for long-running sessions:
@@ -29,6 +29,7 @@ fig_width = fig_width * fig_dpi
 fig_height = fig_height * fig_dpi
 
 # Intialize Plots w/ default fig width/height
+#############################################
 try
   import Plots
 
@@ -44,23 +45,38 @@ catch e
 end
 
 # Initialize CairoMakie with default fig width/height
-try
-  import CairoMakie
+#####################################################
+makie_uuid = Base.UUID("ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a")
 
-  # CairoMakie's display() in PDF format opens an interactive window
-  # instead of saving to the ipynb file, so we don't do that.
-  # https://github.com/quarto-dev/quarto-cli/issues/7548
-  if fig_format == :pdf
-    CairoMakie.activate!(type = "png")
+deps = Pkg.dependencies()
+if makie_uuid ∈ keys(deps)
+  # if Makie is in the environment as direct or inderect dependency  
+  if deps[makie_uuid].is_direct_dep
+    # Import Makie directly if possible
+    import Makie
   else
-    CairoMakie.activate!(type = string(fig_format))
+    # Import Makie indirectly though a backend
+    makie_parent = first(
+      (p.name for p ∈ values(deps) if makie_uuid ∈ values(p.dependencies)) # find a pkg w/ Makie as dependency
+    )
+    @eval import $(Symbol(makie_parent)).Makie
   end
-  CairoMakie.update_theme!(resolution=(fig_width, fig_height))
-catch e
-    # @warn "CairoMakie init" exception=(e, catch_backtrace())
+
+  fig_type = fig_format == :pdf ? "png" : string(fig_format)
+  if deps[makie_uuid].version < v"0.20"
+    Makie.set_theme!(
+      resolution=(fig_width, fig_height),
+      type = fig_type
+    )
+  else
+    Makie.set_theme!(
+      type = fig_type
+    )
+  end
 end
-  
+
 # Set run_path if specified
+##########################
 try
   run_path = raw"{4}"
   if !isempty(run_path)
@@ -73,7 +89,6 @@ end
 
 # emulate old Pkg.installed beahvior, see
 # https://discourse.julialang.org/t/how-to-use-pkg-dependencies-instead-of-pkg-installed/36416/9
-import Pkg
 function isinstalled(pkg::String)
   any(x -> x.name == pkg && x.is_direct_dep, values(Pkg.dependencies()))
 end
