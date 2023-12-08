@@ -57,7 +57,7 @@ if makie_uuid ∈ keys(deps)
   else
     # Import Makie indirectly though a backend
     makie_parent = first(
-      (p.name for p ∈ values(deps) if makie_uuid ∈ values(p.dependencies)) # find a pkg w/ Makie as dependency
+      (p.name for p ∈ values(deps) if p.is_direct_dep && makie_uuid ∈ values(p.dependencies)) # find a pkg w/ Makie as dependency
     )
     @eval import $(Symbol(makie_parent)).Makie
   end
